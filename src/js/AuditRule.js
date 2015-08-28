@@ -124,12 +124,20 @@ axs.AuditRule.prototype.addElement = function(elements, element) {
  * @param {Node} node
  * @param {function(Element): boolean} matcher
  * @param {Array.<Element>} collection
- * @param {ShadowRoot=} opt_shadowRoot The nearest ShadowRoot ancestor, if any.
+ * @param {Object=} options: optional parameters: shadowRoot = The nearest ShadowRoot ancestor, if any. ignoredSelectors = The array of selectors to ignore, if any.
  */
-axs.AuditRule.collectMatchingElements = function(node, matcher, collection,
-                                                 opt_shadowRoot) {
-    if (node.nodeType == Node.ELEMENT_NODE)
+axs.AuditRule.collectMatchingElements = function(node, matcher, collection, options) {
+    options = options || {};
+    if (node.nodeType == Node.ELEMENT_NODE) {
         var element = /** @type {Element} */ (node);
+        if (options.ignoredSelectors) {
+            for (var i = 0; i < options.ignoredSelectors.length; i++) {
+                if (axs.browserUtils.matchSelector(element, options.ignoredSelectors[i])) {
+                    return;
+                }
+            }
+        }
+    }
 
     if (element && matcher.call(null, element))
         collection.push(element);
@@ -143,10 +151,12 @@ axs.AuditRule.collectMatchingElements = function(node, matcher, collection,
         // code, be sure to run the tests in the browser before committing.
         var shadowRoot = element.shadowRoot || element.webkitShadowRoot;
         if (shadowRoot) {
-            axs.AuditRule.collectMatchingElements(shadowRoot,
-                                                  matcher,
-                                                  collection,
-                                                  shadowRoot);
+            axs.AuditRule.collectMatchingElements(
+              shadowRoot,
+              matcher,
+              collection,
+              { shadowRoot: shadowRoot, ignoredSelectors: options.ignoredSelectors }
+            );
             return;
         }
     }
@@ -158,10 +168,7 @@ axs.AuditRule.collectMatchingElements = function(node, matcher, collection,
         var content = /** @type {HTMLContentElement} */ (element);
         var distributedNodes = content.getDistributedNodes();
         for (var i = 0; i < distributedNodes.length; i++) {
-            axs.AuditRule.collectMatchingElements(distributedNodes[i],
-                                                  matcher,
-                                                  collection,
-                                                  opt_shadowRoot);
+            axs.AuditRule.collectMatchingElements(distributedNodes[i], matcher, collection, options);
         }
         return;
     }
@@ -170,27 +177,25 @@ axs.AuditRule.collectMatchingElements = function(node, matcher, collection,
     // current ShadowRoot.
     if (element && element.localName == 'shadow') {
         var shadow = /** @type {HTMLShadowElement} */ (element);
-        if (!opt_shadowRoot) {
+        if (!options.shadowRoot) {
             console.warn('ShadowRoot not provided for', element);
         } else {
             var distributedNodes = shadow.getDistributedNodes();
             for (var i = 0; i < distributedNodes.length; i++) {
-                axs.AuditRule.collectMatchingElements(distributedNodes[i],
-                                                      matcher,
-                                                      collection,
-                                                      opt_shadowRoot);
+                axs.AuditRule.collectMatchingElements(distributedNodes[i], matcher, collection, options);
             }
         }
     }
 
+    // If it is a iframe, get the contentDocument
+    if (element && element.localName == 'iframe' && element.contentDocument) {
+        axs.AuditRule.collectMatchingElements(element.contentDocument, matcher, collection, options);
+    }
     // If it is neither the parent of a ShadowRoot, a <content> element, nor
     // a <shadow> element recurse normally.
     var child = node.firstChild;
     while (child != null) {
-        axs.AuditRule.collectMatchingElements(child,
-                                              matcher,
-                                              collection,
-                                              opt_shadowRoot);
+        axs.AuditRule.collectMatchingElements(child, matcher, collection, options);
         child = child.nextSibling;
     }
 };
@@ -215,7 +220,7 @@ axs.AuditRule.prototype.run = function(options) {
     var maxResults = 'maxResults' in options ? options['maxResults'] : null;
 
     var relevantElements = [];
-    axs.AuditRule.collectMatchingElements(scope, this.relevantElementMatcher_, relevantElements);
+    axs.AuditRule.collectMatchingElements(scope, this.relevantElementMatcher_, relevantElements, {ignoredSelectors: ignoreSelectors});
 
     var failingElements = [];
 
