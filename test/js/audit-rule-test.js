@@ -52,7 +52,7 @@
         fooElement.appendChild(fooTest);
         var matched = [];
         var ignoredSelectors = ['.foo'];
-        axs.AuditRule.collectMatchingElements(container, matcher, matched, {ignoredSelectors: ignoredSelectors});
+        axs.AuditRule.collectMatchingElements(container, matcher, matched, ignoredSelectors);
         equal(matched.length, DIV_COUNT);
     });
 

@@ -119,20 +119,29 @@ axs.AuditRule.prototype.addElement = function(elements, element) {
 };
 
 /**
+ * @param {Node} node
+ * @param {function(Element): boolean} matcher
+ * @param {Array<string>=} opt_ignoreSelectors The array of selectors to ignore, if any.
+ */
+axs.AuditRule.collectMatchingElements = function(node, matcher, collection, opt_ignoreSelectors) {
+    axs.AuditRule.collectMatchingElementsInternal(node, matcher, collection, null, opt_ignoreSelectors);
+};
+
+/**
  * Recursively collect elements which match |matcher| into |collection|,
  * starting at |node|.
  * @param {Node} node
  * @param {function(Element): boolean} matcher
  * @param {Array.<Element>} collection
- * @param {Object=} options: optional parameters: shadowRoot = The nearest ShadowRoot ancestor, if any. ignoredSelectors = The array of selectors to ignore, if any.
+ * @param {?ShadowRoot} opt_shadowRoot The nearest ShadowRoot ancestor, if any
+ * @param {Array<string>=} opt_ignoreSelectors The array of selectors to ignore, if any.
  */
-axs.AuditRule.collectMatchingElements = function(node, matcher, collection, options) {
-    options = options || {};
+axs.AuditRule.collectMatchingElementsInternal = function(node, matcher, collection, opt_shadowRoot, opt_ignoreSelectors) {
     if (node.nodeType == Node.ELEMENT_NODE) {
         var element = /** @type {Element} */ (node);
-        if (options.ignoredSelectors) {
-            for (var i = 0; i < options.ignoredSelectors.length; i++) {
-                if (axs.browserUtils.matchSelector(element, options.ignoredSelectors[i])) {
+        if (opt_ignoreSelectors) {
+            for (var i = 0; i < opt_ignoreSelectors.length; i++) {
+                if (axs.browserUtils.matchSelector(element, opt_ignoreSelectors[i])) {
                     return;
                 }
             }
@@ -149,13 +158,14 @@ axs.AuditRule.collectMatchingElements = function(node, matcher, collection, opti
     if (element) {
         // NOTE: grunt qunit DOES NOT support Shadow DOM, so if changing this
         // code, be sure to run the tests in the browser before committing.
-        var shadowRoot = element.shadowRoot || element.webkitShadowRoot;
+        var shadowRoot = opt_shadowRoot || element.webkitShadowRoot;
         if (shadowRoot) {
-            axs.AuditRule.collectMatchingElements(
+            axs.AuditRule.collectMatchingElementsInternal(
               shadowRoot,
               matcher,
               collection,
-              { shadowRoot: shadowRoot, ignoredSelectors: options.ignoredSelectors }
+              shadowRoot,
+              opt_ignoreSelectors
             );
             return;
         }
@@ -168,7 +178,7 @@ axs.AuditRule.collectMatchingElements = function(node, matcher, collection, opti
         var content = /** @type {HTMLContentElement} */ (element);
         var distributedNodes = content.getDistributedNodes();
         for (var i = 0; i < distributedNodes.length; i++) {
-            axs.AuditRule.collectMatchingElements(distributedNodes[i], matcher, collection, options);
+            axs.AuditRule.collectMatchingElementsInternal(distributedNodes[i], matcher, collection, opt_shadowRoot, opt_ignoreSelectors);
         }
         return;
     }
@@ -177,25 +187,25 @@ axs.AuditRule.collectMatchingElements = function(node, matcher, collection, opti
     // current ShadowRoot.
     if (element && element.localName == 'shadow') {
         var shadow = /** @type {HTMLShadowElement} */ (element);
-        if (!options.shadowRoot) {
+        if (!opt_shadowRoot) {
             console.warn('ShadowRoot not provided for', element);
         } else {
             var distributedNodes = shadow.getDistributedNodes();
             for (var i = 0; i < distributedNodes.length; i++) {
-                axs.AuditRule.collectMatchingElements(distributedNodes[i], matcher, collection, options);
+                axs.AuditRule.collectMatchingElementsInternal(distributedNodes[i], matcher, collection, opt_shadowRoot, opt_ignoreSelectors);
             }
         }
     }
 
     // If it is a iframe, get the contentDocument
     if (element && element.localName == 'iframe' && element.contentDocument) {
-        axs.AuditRule.collectMatchingElements(element.contentDocument, matcher, collection, options);
+        axs.AuditRule.collectMatchingElementsInternal(element.contentDocument, matcher, collection, opt_shadowRoot, opt_ignoreSelectors);
     }
     // If it is neither the parent of a ShadowRoot, a <content> element, nor
     // a <shadow> element recurse normally.
     var child = node.firstChild;
     while (child != null) {
-        axs.AuditRule.collectMatchingElements(child, matcher, collection, options);
+        axs.AuditRule.collectMatchingElementsInternal(child, matcher, collection, opt_shadowRoot, opt_ignoreSelectors);
         child = child.nextSibling;
     }
 };
@@ -220,7 +230,7 @@ axs.AuditRule.prototype.run = function(options) {
     var maxResults = 'maxResults' in options ? options['maxResults'] : null;
 
     var relevantElements = [];
-    axs.AuditRule.collectMatchingElements(scope, this.relevantElementMatcher_, relevantElements, {ignoredSelectors: ignoreSelectors});
+    axs.AuditRule.collectMatchingElements(scope, this.relevantElementMatcher_, relevantElements, ignoreSelectors);
 
     var failingElements = [];
 
