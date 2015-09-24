@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Generated from http://github.com/GoogleChrome/accessibility-developer-tools/tree/7f7ba5860f79d583eb4b1a241b43f119dca27585
+ * Generated from http://github.com/GoogleChrome/accessibility-developer-tools/tree/c492e0b8e44ef4c8ec942a8a5c5166c50b1a1180
  *
  * See project README for build steps.
  */
@@ -1121,16 +1121,59 @@ axs.utils.getQuerySelectorText = function(a) {
   }
   return "";
 };
-axs.utils.getIdReferrers = function(a, b) {
+axs.utils.getAriaIdReferrers = function(a, b) {
+  var c = function(a) {
+    var b = axs.constants.ARIA_PROPERTIES[a];
+    if (b) {
+      if ("idref" === b.valueType) {
+        return "[aria-" + a + "='" + d + "']";
+      }
+      if ("idref_list" === b.valueType) {
+        return "[aria-" + a + "~='" + d + "']";
+      }
+    }
+    return "";
+  };
+  if (!a) {
+    return null;
+  }
+  var d = a.id;
+  if (!d) {
+    return null;
+  }
+  d = d.replace(/'/g, "\\'");
+  if (b) {
+    var e = b.replace(/^aria-/, ""), f = c(e);
+    if (f) {
+      return a.ownerDocument.querySelectorAll(f);
+    }
+  } else {
+    var g = [];
+    for (e in axs.constants.ARIA_PROPERTIES) {
+      (f = c(e)) && g.push(f);
+    }
+    return a.ownerDocument.querySelectorAll(g.join(","));
+  }
+  return null;
+};
+axs.utils.getHtmlIdReferrers = function(a) {
+  if (!a) {
+    return null;
+  }
+  var b = a.id;
   if (!b) {
     return null;
   }
-  var c = b.id, d = a.replace(/^aria-/, ""), d = axs.constants.ARIA_PROPERTIES[d];
-  if (!c || !d) {
-    return null;
-  }
-  d = d.valueType;
-  return "idref_list" === d || "idref" === d ? (c = c.replace(/'/g, "\\'"), b.ownerDocument.querySelectorAll("[" + a + "~='" + c + "']")) : null;
+  var b = b.replace(/'/g, "\\'"), c = "[contextmenu='{id}'] [itemref~='{id}'] button[form='{id}'] button[menu='{id}'] fieldset[form='{id}'] input[form='{id}'] input[list='{id}'] keygen[form='{id}'] label[for='{id}'] label[form='{id}'] menuitem[command='{id}'] object[form='{id}'] output[for~='{id}'] output[form='{id}'] select[form='{id}'] td[headers~='{id}'] textarea[form='{id}'] tr[headers~='{id}']".split(" ").map(function(a) {
+    return a.replace("{id}", b);
+  });
+  return a.ownerDocument.querySelectorAll(c.join(","));
+};
+axs.utils.getIdReferrers = function(a) {
+  var b = [], c = axs.utils.getHtmlIdReferrers(a);
+  c && (b = b.concat(Array.prototype.slice.call(c)));
+  (c = axs.utils.getAriaIdReferrers(a)) && (b = b.concat(Array.prototype.slice.call(c)));
+  return b;
 };
 axs.utils.getIdReferents = function(a, b) {
   var c = [], d = a.replace(/^aria-/, ""), d = axs.constants.ARIA_PROPERTIES[d];
@@ -1264,7 +1307,7 @@ axs.properties.getContrastRatioProperties = function(a) {
 axs.properties.findTextAlternatives = function(a, b, c, d) {
   var e = c || !1;
   c = axs.utils.asElement(a);
-  if (!c || !e && !d && axs.utils.isElementOrAncestorHidden(c)) {
+  if (!c || !d && axs.utils.isElementOrAncestorHidden(c)) {
     return null;
   }
   if (a.nodeType == Node.TEXT_NODE) {
@@ -1272,17 +1315,23 @@ axs.properties.findTextAlternatives = function(a, b, c, d) {
   }
   a = null;
   e || (a = axs.properties.getTextFromAriaLabelledby(c, b));
-  c.hasAttribute("aria-label") && (d = {type:"text"}, d.text = c.getAttribute("aria-label"), d.lastWord = axs.properties.getLastWord(d.text), a ? d.unused = !0 : e && axs.utils.elementIsHtmlControl(c) || (a = d.text), b.ariaLabel = d);
+  if (c.hasAttribute("aria-label")) {
+    var f = {type:"text"};
+    f.text = c.getAttribute("aria-label");
+    f.lastWord = axs.properties.getLastWord(f.text);
+    a ? f.unused = !0 : e && axs.utils.elementIsHtmlControl(c) || (a = f.text);
+    b.ariaLabel = f;
+  }
   c.hasAttribute("role") && "presentation" == c.getAttribute("role") || (a = axs.properties.getTextFromHostLanguageAttributes(c, b, a, e));
   if (e && axs.utils.elementIsHtmlControl(c)) {
-    d = c.ownerDocument.defaultView;
-    if (c instanceof d.HTMLInputElement) {
-      var f = c;
-      "text" == f.type && f.value && 0 < f.value.length && (b.controlValue = {text:f.value});
-      "range" == f.type && (b.controlValue = {text:f.value});
+    f = c.ownerDocument.defaultView;
+    if (c instanceof f.HTMLInputElement) {
+      var g = c;
+      "text" == g.type && g.value && 0 < g.value.length && (b.controlValue = {text:g.value});
+      "range" == g.type && (b.controlValue = {text:g.value});
     }
-    c instanceof d.HTMLSelectElement && (b.controlValue = {text:c.value});
-    b.controlValue && (d = b.controlValue, a ? d.unused = !0 : a = d.text);
+    c instanceof f.HTMLSelectElement && (b.controlValue = {text:c.value});
+    b.controlValue && (f = b.controlValue, a ? f.unused = !0 : a = f.text);
   }
   if (e && axs.utils.elementIsAriaWidget(c)) {
     e = c.getAttribute("role");
@@ -1291,43 +1340,39 @@ axs.properties.findTextAlternatives = function(a, b, c, d) {
       c.hasAttribute("aria-valuetext") ? b.controlValue = {text:c.getAttribute("aria-valuetext")} : c.hasAttribute("aria-valuenow") && (b.controlValue = {value:c.getAttribute("aria-valuenow"), text:"" + c.getAttribute("aria-valuenow")});
     }
     if ("menu" == e) {
-      var g = c.querySelectorAll("[role=menuitemcheckbox], [role=menuitemradio]");
-      d = [];
-      for (f = 0;f < g.length;f++) {
-        "true" == g[f].getAttribute("aria-checked") && d.push(g[f]);
+      for (var h = c.querySelectorAll("[role=menuitemcheckbox], [role=menuitemradio]"), f = [], g = 0;g < h.length;g++) {
+        "true" == h[g].getAttribute("aria-checked") && f.push(h[g]);
       }
-      if (0 < d.length) {
-        g = "";
-        for (f = 0;f < d.length;f++) {
-          g += axs.properties.findTextAlternatives(d[f], {}, !0), f < d.length - 1 && (g += ", ");
+      if (0 < f.length) {
+        h = "";
+        for (g = 0;g < f.length;g++) {
+          h += axs.properties.findTextAlternatives(f[g], {}, !0), g < f.length - 1 && (h += ", ");
         }
-        b.controlValue = {text:g};
+        b.controlValue = {text:h};
       }
     }
     if ("combobox" == e || "select" == e) {
       b.controlValue = {text:"TODO"};
     }
-    b.controlValue && (d = b.controlValue, a ? d.unused = !0 : a = d.text);
+    b.controlValue && (f = b.controlValue, a ? f.unused = !0 : a = f.text);
   }
-  d = !0;
-  c.hasAttribute("role") && (e = c.getAttribute("role"), (e = axs.constants.ARIA_ROLES[e]) && (!e.namefrom || 0 > e.namefrom.indexOf("contents")) && (d = !1));
-  (e = axs.properties.getTextFromDescendantContent(c)) && d && (d = {type:"text"}, d.text = e, d.lastWord = axs.properties.getLastWord(d.text), a ? d.unused = !0 : a = e, b.content = d);
-  c.hasAttribute("title") && (e = {type:"string", valid:!0}, e.text = c.getAttribute("title"), e.lastWord = axs.properties.getLastWord(e.lastWord), a ? e.unused = !0 : a = e.text, b.title = e);
+  f = !0;
+  c.hasAttribute("role") && (e = c.getAttribute("role"), (e = axs.constants.ARIA_ROLES[e]) && (!e.namefrom || 0 > e.namefrom.indexOf("contents")) && (f = !1));
+  (d = axs.properties.getTextFromDescendantContent(c, d)) && f && (e = {type:"text"}, e.text = d, e.lastWord = axs.properties.getLastWord(e.text), a ? e.unused = !0 : a = d, b.content = e);
+  c.hasAttribute("title") && (d = {type:"string", valid:!0}, d.text = c.getAttribute("title"), d.lastWord = axs.properties.getLastWord(d.lastWord), a ? d.unused = !0 : a = d.text, b.title = d);
   return 0 == Object.keys(b).length && null == a ? null : a;
 };
-axs.properties.getTextFromDescendantContent = function(a) {
-  var b = a.childNodes;
-  a = [];
-  for (var c = 0;c < b.length;c++) {
-    var d = axs.properties.findTextAlternatives(b[c], {}, !0);
-    d && a.push(d.trim());
+axs.properties.getTextFromDescendantContent = function(a, b) {
+  for (var c = a.childNodes, d = [], e = 0;e < c.length;e++) {
+    var f = axs.properties.findTextAlternatives(c[e], {}, !0, b);
+    f && d.push(f.trim());
   }
-  if (a.length) {
-    b = "";
-    for (c = 0;c < a.length;c++) {
-      b = [b, a[c]].join(" ").trim();
+  if (d.length) {
+    c = "";
+    for (e = 0;e < d.length;e++) {
+      c = [c, d[e]].join(" ").trim();
     }
-    return b;
+    return c;
   }
   return null;
 };
@@ -1340,7 +1385,7 @@ axs.properties.getTextFromAriaLabelledby = function(a, b) {
     var k = {type:"element"}, m = d[h];
     k.value = m;
     var l = document.getElementById(m);
-    l ? (k.valid = !0, k.text = axs.properties.findTextAlternatives(l, {}, !0), k.lastWord = axs.properties.getLastWord(k.text), f.push(l.textContent.trim()), k.element = l) : (k.valid = !1, e.valid = !1, k.errorMessage = {messageKey:"noElementWithId", args:[m]});
+    l ? (k.valid = !0, k.text = axs.properties.findTextAlternatives(l, {}, !0, !0), k.lastWord = axs.properties.getLastWord(k.text), f.push(k.text), k.element = l) : (k.valid = !1, e.valid = !1, k.errorMessage = {messageKey:"noElementWithId", args:[m]});
     g.push(k);
   }
   0 < g.length && (g[g.length - 1].last = !0, e.values = g, e.text = f.join(" "), e.lastWord = axs.properties.getLastWord(e.text), c = e.text, b.ariaLabelledby = e);
@@ -1376,6 +1421,7 @@ axs.properties.getTextFromHostLanguageAttributes = function(a, b, c, d) {
       d = axs.utils.parentElement(d);
     }
     e.text && (c ? e.unused = !0 : c = e.text, b.labelWrapped = e);
+    axs.browserUtils.matchSelector(a, 'input[type="image"]') && a.hasAttribute("alt") && (e = {type:"string", valid:!0}, e.text = a.getAttribute("alt"), c ? e.unused = !0 : c = e.text, b.alt = e);
     Object.keys(b).length || (b.noLabel = !0);
   }
   return c;
@@ -1587,20 +1633,19 @@ axs.AuditRule.collectMatchingElements = function(a, b, c, d) {
     }
   }
   if (e && "content" == e.localName) {
-    for (var f = e.getDistributedNodes(), g = 0;g < f.length;g++) {
-      axs.AuditRule.collectMatchingElements(f[g], b, c, d);
+    for (e = e.getDistributedNodes(), f = 0;f < e.length;f++) {
+      axs.AuditRule.collectMatchingElements(e[f], b, c, d);
     }
   } else {
     if (e && "shadow" == e.localName) {
       if (f = e, d) {
-        for (f = f.getDistributedNodes(), g = 0;g < f.length;g++) {
-          axs.AuditRule.collectMatchingElements(f[g], b, c, d);
+        for (e = f.getDistributedNodes(), f = 0;f < e.length;f++) {
+          axs.AuditRule.collectMatchingElements(e[f], b, c, d);
         }
       } else {
         console.warn("ShadowRoot not provided for", e);
       }
     }
-    e && "iframe" == e.localName && e.contentDocument && axs.AuditRule.collectMatchingElements(e.contentDocument, b, c, d);
     for (a = a.firstChild;null != a;) {
       axs.AuditRule.collectMatchingElements(a, b, c, d), a = a.nextSibling;
     }
@@ -1830,7 +1875,7 @@ axs.AuditRules.addRule({name:"ariaRoleNotScoped", heading:"Elements with ARIA ro
       return !1;
     }
   }
-  if (a = axs.utils.getIdReferrers("aria-owns", a)) {
+  if (a = axs.utils.getAriaIdReferrers(a, "aria-owns")) {
     for (c = 0;c < a.length;c++) {
       if ((d = axs.utils.getRoles(a[c], !0)) && d.applied && 0 <= b.indexOf(d.applied.name)) {
         return !1;
@@ -1905,14 +1950,12 @@ axs.AuditRules.addRule({name:"controlsWithoutLabel", heading:"Controls and media
   a = axs.properties.findTextAlternatives(a, {});
   return null === a || "" === a.trim() ? !0 : !1;
 }, code:"AX_TEXT_01", ruleName:"Controls and media elements should have labels"});
-axs.AuditRules.addRule({name:"duplicateId", heading:"An element's ID must be unique in the DOM", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_html_02", severity:axs.constants.Severity.SEVERE, relevantElementMatcher:function(a) {
-  return axs.browserUtils.matchSelector(a, "[id]");
+axs.AuditRules.addRule({name:"duplicateId", heading:"Any ID referred to via an IDREF must be unique in the DOM", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_html_02", severity:axs.constants.Severity.SEVERE, relevantElementMatcher:function(a) {
+  return a.hasAttribute("id") ? axs.utils.getIdReferrers(a).some(function(a) {
+    return !axs.utils.isElementOrAncestorHidden(a);
+  }) : !1;
 }, test:function(a) {
-  var b = a.id;
-  if (!b) {
-    return !1;
-  }
-  b = "[id='" + b.replace(/'/g, "\\'") + "']";
+  var b = "[id='" + a.id.replace(/'/g, "\\'") + "']";
   return 1 < a.ownerDocument.querySelectorAll(b).length;
 }, code:"AX_HTML_02"});
 axs.AuditRules.addRule({name:"focusableElementNotVisibleAndNotAriaHidden", heading:"These elements are focusable but either invisible or obscured by another element", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_focus_01", severity:axs.constants.Severity.WARNING, relevantElementMatcher:function(a) {
@@ -2007,7 +2050,7 @@ axs.AuditRules.addRule({name:"multipleAriaOwners", heading:"An element's ID must
   return axs.browserUtils.matchSelector(a, "[aria-owns]");
 }, test:function(a) {
   return axs.utils.getIdReferents("aria-owns", a).some(function(a) {
-    return 1 < axs.utils.getIdReferrers("aria-owns", a).length;
+    return 1 < axs.utils.getAriaIdReferrers(a, "aria-owns").length;
   });
 }, code:"AX_ARIA_07"});
 axs.AuditRules.addRule({name:"multipleLabelableElementsPerLabel", heading:"A label element may not have labelable descendants other than its labeled control.", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#-ax_text_03--labels-should-only-contain-one-labelable-element", severity:axs.constants.Severity.SEVERE, relevantElementMatcher:function(a) {
@@ -2088,6 +2131,11 @@ axs.AuditRules.addRule({name:"requiredAriaAttributeMissing", heading:"Elements w
     return !0;
   }, code:"AX_ARIA_08"});
 })();
+axs.AuditRules.addRule({name:"roleTooltipRequiresDescribedby", heading:"Elements with role=tooltip should have a corresponding element with aria-describedby", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_aria_02", severity:axs.constants.Severity.SEVERE, relevantElementMatcher:function(a) {
+  return axs.browserUtils.matchSelector(a, "[role=tooltip]") && !axs.utils.isElementOrAncestorHidden(a);
+}, test:function(a) {
+  return 0 === axs.utils.getAriaIdReferrers(a, "aria-describedby").length;
+}, code:"AX_TOOLTIP_01"});
 axs.AuditRules.addRule({name:"tabIndexGreaterThanZero", heading:"Avoid positive integer values for tabIndex", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_focus_03", severity:axs.constants.Severity.WARNING, relevantElementMatcher:function(a) {
   return axs.browserUtils.matchSelector(a, "[tabindex]");
 }, test:function(a) {
@@ -2095,6 +2143,67 @@ axs.AuditRules.addRule({name:"tabIndexGreaterThanZero", heading:"Avoid positive 
     return !0;
   }
 }, code:"AX_FOCUS_03"});
+(function() {
+  axs.AuditRules.addRule({name:"tableHasAppropriateHeaders", heading:"Tables should have appropriate headers", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_table_01", severity:axs.constants.Severity.SEVERE, relevantElementMatcher:function(a) {
+    return axs.browserUtils.matchSelector(a, "table");
+  }, test:function(a) {
+    if ("presentation" == a.getAttribute("role")) {
+      return 0 != a.querySelectorAll("th").length;
+    }
+    a = a.querySelectorAll("tr");
+    var b;
+    a: {
+      b = a[0].children;
+      for (var c = 0;c < b.length;c++) {
+        if ("TH" != b[c].tagName) {
+          b = !0;
+          break a;
+        }
+      }
+      b = !1;
+    }
+    if (b) {
+      a: {
+        for (b = 0;b < a.length;b++) {
+          if ("TH" != a[b].children[0].tagName) {
+            b = !0;
+            break a;
+          }
+        }
+        b = !1;
+      }
+    }
+    if (b) {
+      a: {
+        b = a[0].children;
+        for (c = 1;c < b.length;c++) {
+          if ("TH" != b[c].tagName) {
+            b = !0;
+            break a;
+          }
+        }
+        for (c = 1;c < a.length;c++) {
+          if ("TH" != a[c].children[0].tagName) {
+            b = !0;
+            break a;
+          }
+        }
+        b = !1;
+      }
+    }
+    return b;
+  }, code:"AX_TABLE_01"});
+})();
+(function() {
+  axs.AuditRules.addRule({name:"uncontrolledTabpanel", heading:"A tabpanel should be related to a tab via aria-controls or aria-labelledby", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_aria_13", severity:axs.constants.Severity.WARNING, relevantElementMatcher:function(a) {
+    return axs.browserUtils.matchSelector(a, '[role="tabpanel"]');
+  }, test:function(a) {
+    var b;
+    b = document.querySelectorAll('[role="tab"][aria-controls="' + a.id + '"]');
+    (b = a.id && 1 === b.length) || (a.hasAttribute("aria-labelledby") ? (a = document.querySelectorAll("#" + a.getAttribute("aria-labelledby")), b = 1 === a.length && "tab" === a[0].getAttribute("role")) : b = !1);
+    return !b;
+  }, code:"AX_ARIA_13"});
+})();
 axs.AuditRules.addRule({name:"unfocusableElementsWithOnClick", heading:"Elements with onclick handlers must be focusable", url:"https://github.com/GoogleChrome/accessibility-developer-tools/wiki/Audit-Rules#ax_focus_02", severity:axs.constants.Severity.WARNING, opt_requiresConsoleAPI:!0, relevantElementMatcher:function(a) {
   return a instanceof a.ownerDocument.defaultView.HTMLBodyElement || axs.utils.isElementOrAncestorHidden(a) ? !1 : "click" in getEventListeners(a) ? !0 : !1;
 }, test:function(a) {
